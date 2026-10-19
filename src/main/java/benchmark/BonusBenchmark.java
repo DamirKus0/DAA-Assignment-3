@@ -3,6 +3,11 @@ package benchmark;
 import algorithms.Kosaraju;
 import algorithms.SccResult;
 import algorithms.Tarjan;
+import algorithms.Condensation;
+import algorithms.CriticalPath;
+import algorithms.DagShortestPath;
+import algorithms.PathResult;
+import graph.Edge;
 import graph.Graph;
 import metrics.Metrics;
 
@@ -54,10 +59,81 @@ public final class BonusBenchmark {
                         metrics.edgeScans, metrics.maxDepth, actual.componentCount());
                 rows.add(row);
                 System.out.println(row);
+                rows.add(criticalRow(graph, actual));
             }
         }
         Files.createDirectories(output.toAbsolutePath().getParent());
         Files.write(output, rows);
-        System.out.println("Verified all bonus SCC results; wrote " + (rows.size() - 1) + " rows to " + output);
+        System.out.println("Verified SCC and critical paths; wrote " + (rows.size() - 1) + " rows to " + output);
+    }
+
+    private static String criticalRow(Graph original, SccResult components) {
+        long[] times = new long[5];
+        Metrics metrics = new Metrics();
+        Condensation condensation = null;
+        CriticalPath.Result result = null;
+        for (int run = 0; run < 5; run++) {
+            long start = System.nanoTime();
+            condensation = Condensation.build(original, components);
+            result = CriticalPath.compute(condensation, metrics);
+            times[run] = System.nanoTime() - start;
+            validateCritical(condensation, result);
+            if (metrics.edgeScans != condensation.graph().edgeCount()) {
+                throw new IllegalStateException("Wrong critical path scan count");
+            }
+        }
+        Arrays.sort(times);
+        Graph dag = condensation.graph();
+        String row = String.format(Locale.ROOT, "CriticalPath,condensation_from_%d_%d,%d,%d,%.6f,0,%d,%d,0,%d",
+                original.vertexCount(), original.edgeCount(), dag.vertexCount(), dag.edgeCount(),
+                times[2] / 1_000_000.0, metrics.edgeScans, metrics.comparisons, result.duration());
+        System.out.println(row);
+        return row;
+    }
+
+    /** Independent max-to-min transformation: negate durations and add one source. */
+    private static void validateCritical(Condensation condensation, CriticalPath.Result result) {
+        Graph dag = condensation.graph();
+        int n = dag.vertexCount();
+        Graph negative = new Graph(n + 1, true);
+        boolean[] hasIncoming = new boolean[n];
+        for (Edge edge : dag.edges()) {
+            negative.addEdge(edge.from, edge.to, -condensation.durationOf(edge.to));
+            hasIncoming[edge.to] = true;
+        }
+        for (int vertex = 0; vertex < n; vertex++) {
+            if (!hasIncoming[vertex]) {
+                negative.addEdge(n, vertex, -condensation.durationOf(vertex));
+            }
+        }
+        PathResult shortest = DagShortestPath.compute(negative);
+        long[] finish = result.finishTimes();
+        long best = 0;
+        for (int vertex = 0; vertex < n; vertex++) {
+            if (finish[vertex] != -shortest.distanceTo(vertex)) {
+                throw new IllegalStateException("Critical path disagrees with sign-flipped shortest paths");
+            }
+            best = Math.max(best, finish[vertex]);
+        }
+        long pathDuration = 0;
+        int previous = -1;
+        for (int vertex : result.componentPath()) {
+            pathDuration += condensation.durationOf(vertex);
+            if (previous != -1) {
+                boolean found = false;
+                for (Edge edge : dag.neighbors(previous)) {
+                    if (edge.to == vertex) {
+                        found = true;
+                    }
+                }
+                if (!found) {
+                    throw new IllegalStateException("Missing critical path edge");
+                }
+            }
+            previous = vertex;
+        }
+        if (best != result.duration() || pathDuration != best) {
+            throw new IllegalStateException("Invalid critical path duration");
+        }
     }
 }

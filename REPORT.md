@@ -173,6 +173,23 @@ on all ten generated directed graphs. Tarjan needs O(n+m) time and O(n) extra
 space, scans m edges rather than Kosaraju's 2m DFS scans, and also avoids building
 the reverse graph. `results/bonus.csv` holds these measurements separately.
 
+**Bonus condensation and critical path.** Each SCC becomes an indivisible block
+of duration equal to its number of original vertices; dependencies have zero lag,
+and original edge weights are ignored. This assumes internal cyclic dependencies
+have been resolved; contraction alone does not make a deadlock schedulable.
+Duplicate inter-component dependencies are removed. The condensation is acyclic,
+since a cycle of components would imply mutual reachability and one SCC.
+Topological max-relaxation computes earliest block completion and the longest
+duration chain, with source durations included. It is checked by exhaustive path
+enumeration on small graphs and by sign-flipped shortest paths on all ten generated
+configurations. With c SCCs and e dependencies, the path pass costs O(c+e) time and
+O(c) extra space; condensation construction takes expected O(n+m) time/space using
+a hash set. The longest simple path in a general graph is NP-hard, whereas a DAG
+admits this dynamic program. The result models project makespan with unlimited
+parallel resources. Bonus CSV has 20 rows; CriticalPath n/m refer to the condensed
+graph, with original sizes in its label. Its timer includes condensation and path
+computation but excludes the separately measured SCC computation.
+
 The detailed requirement specifies ten size/density configurations, each with
 three graph kinds and five algorithm rows. This produces 50 rows, resolving the
 deliverables' conflicting phrase “four generated graphs”; DSU is not a sixth row.
