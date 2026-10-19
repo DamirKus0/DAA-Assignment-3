@@ -1,0 +1,9 @@
+java.version=17.0.18
+java.vendor=Microsoft
+os.name=Mac OS X
+os.arch=aarch64
+processors=8
+max_heap_bytes=2147483648
+runs=5
+warmup_runs=0
+seed=42
