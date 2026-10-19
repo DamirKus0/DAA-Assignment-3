@@ -165,6 +165,14 @@ Prim is specific to this generator and implementation.
 
 ## 6. Requirement interpretations and reproduction
 
+**Bonus Tarjan.** The iterative implementation uses discovery indices, lowlink,
+a DFS-path stack and a separate active-SCC stack. Tests include 100 random graphs,
+100,000-vertex paths/cycles and edges into already completed SCCs. The bonus
+benchmark compares the entire partition with Kosaraju, not just component counts,
+on all ten generated directed graphs. Tarjan needs O(n+m) time and O(n) extra
+space, scans m edges rather than Kosaraju's 2m DFS scans, and also avoids building
+the reverse graph. `results/bonus.csv` holds these measurements separately.
+
 The detailed requirement specifies ten size/density configurations, each with
 three graph kinds and five algorithm rows. This produces 50 rows, resolving the
 deliverables' conflicting phrase “four generated graphs”; DSU is not a sixth row.

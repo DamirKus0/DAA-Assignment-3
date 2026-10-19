@@ -5,10 +5,11 @@
 и кратчайшие пути в DAG.
 Код использует обычные массивы, циклы и коллекции Java.
 
-**Текущий этап: `feature/metrics`.** Реализованы Graph, чтение файлов, DSU,
+**Текущий этап: `feature/scc-tarjan`.** Реализованы Graph, чтение файлов, DSU,
 Kruskal, Prim, итеративный Kosaraju, Kahn, кратчайшие пути в DAG,
 их счётчики и тесты, полный бенчмарк, CSV, три графика и отчёт.
-Все 50 строк прошли проверку по таблице задания. Бонусы ещё не реализованы.
+Все 50 строк прошли проверку по таблице задания. Добавлен бонус Tarjan;
+конденсация и критический путь — следующий этап.
 
 Автор: `<NAME SURNAME>`; группа: `<GROUP>`.
 GitHub: https://github.com/DamirKus0/DAA-Assignment-3
@@ -32,6 +33,7 @@ mvn -Dtest=KosarajuTest,KahnTest test
 mvn -Dtest=DagShortestPathTest test
 mvn package
 java -Xmx2g -cp target/classes benchmark.Benchmark
+java -Xmx2g -cp target/classes benchmark.BonusBenchmark
 python3 -m pip install -r requirements-plots.txt
 python3 scripts/plot_results.py
 ```
@@ -59,6 +61,7 @@ src/main/java/
   algorithms/Prim.java
   algorithms/MstResult.java
   algorithms/Kosaraju.java
+  algorithms/Tarjan.java
   algorithms/SccResult.java
   algorithms/Kahn.java
   algorithms/DagShortestPath.java
@@ -67,11 +70,13 @@ src/main/java/
   benchmark/GraphGenerator.java
   benchmark/ReferenceValues.java
   benchmark/Benchmark.java
+  benchmark/BonusBenchmark.java
 src/test/java/
   graph/GraphTest.java
   algorithms/DSUTest.java
   algorithms/MstTest.java
   algorithms/KosarajuTest.java
+  algorithms/TarjanTest.java
   algorithms/KahnTest.java
   algorithms/DagShortestPathTest.java
   benchmark/BenchmarkTest.java
@@ -85,6 +90,7 @@ REPORT.md
 scripts/plot_results.py
 requirements-plots.txt
 results/results.csv
+results/bonus.csv
 results/environment.txt
 results/analysis.json
 results/plots/ (три PNG)
@@ -469,6 +475,29 @@ MST-алгоритмов и точные `edgeScans`. Ошибка заверш�
 В `results/analysis.json` сохраняются наклоны, нормированные счётчики и времена,
 использованные в [REPORT.md](REPORT.md). Совпадающие линии в графиках ожидаемы:
 Kahn и DAG-релаксации просматривают `m`, Prim и Kosaraju — `2m` по своим правилам.
+
+## Бонус: Tarjan SCC
+
+`Tarjan.compute` выделяет SCC за один итеративный DFS, без обратного графа.
+`index[v]` — номер открытия вершины, `lowlink[v]` — минимальный индекс, достижимый
+по дереву DFS и допустимой ссылке на активную вершину. При возврате от потомка
+его `lowlink` передаётся родителю. Ребро к уже завершённой SCC не уменьшает
+`lowlink`; для ребра к активному соседу используется его `index`.
+При `lowlink[v] == index[v]` из стека активных вершин снимается одна SCC до `v`.
+
+Есть два массива стека: текущий путь DFS и вершины ещё не закрытых SCC.
+`maxDepth` измеряет только текущий путь DFS, как у Kosaraju, а не размер второго
+стека. `edgeScans = m`, сравнения весов и DSU-операции равны 0. Время `O(n+m)`,
+дополнительная память `O(n)`. `SccResult.samePartitionAs` сравнивает разбиения
+через взаимно однозначное соответствие меток за `O(n+c)`, не сравнивая номера напрямую.
+
+`TarjanTest` сверяет результат с Kosaraju на двух файлах, 100 случайных графах
+(seed 98765), петлях, параллельных рёбрах, изолятах, пути и цикле из 100 000 вершин.
+`BonusBenchmark` делает пять запусков Tarjan на каждой из 10 конфигураций
+ориентированного генератора и сверяет полный состав компонент с Kosaraju.
+Время — медиана; валидация вне таймера. `results/bonus.csv` отделён от обязательных
+50 строк. Tarjan просматривает `m` рёбер против `2m` в DFS Kosaraju; кроме того,
+ему не требуется проход для построения обратного графа.
 
 ## Порядок работы с Git
 
@@ -938,3 +967,36 @@ CSV записывается только после успешного прох
 3. Как найти взаимно зависимые задачи? SCC; для допустимого порядка использовать Kahn.
 4. Что делать при вопросе об ИИ? Честно назвать помощь и самостоятельно объяснить
    реализацию, проверки и решения.
+
+### TARJAN — один DFS и стек активных вершин
+
+**Файлы для копирования в чат:** `src/main/java/algorithms/Tarjan.java`,
+`src/main/java/algorithms/SccResult.java`, `src/main/java/algorithms/Kosaraju.java`,
+`src/test/java/algorithms/TarjanTest.java`, `src/main/java/benchmark/BonusBenchmark.java`.
+
+**Классы и методы:** `Tarjan.compute`, `SccResult.samePartitionAs`,
+`TarjanTest.check`, `BonusBenchmark.main`.
+
+**Задача:** найти то же разбиение SCC одним обходом исходного графа.
+Индексы и lowlink показывают, может ли вершина связаться с более ранней активной
+частью обхода. Когда найден корень SCC, её вершины снимаются со второго стека.
+Явный стек кадров позволяет обойти большой граф без рекурсии.
+
+**Термины:** index — номер открытия; lowlink — наименьший достижимый активный
+индекс по правилам Tarjan; активная вершина — ещё не назначенная завершённой SCC;
+корень SCC — вершина с равными index и lowlink.
+
+**Что объяснить:** различие двух стеков, обновление lowlink после потомка,
+игнорирование рёбер в завершённые SCC и сравнение произвольных меток компонент.
+
+**Вопросы преподавателя:**
+
+1. Почему не нужен обратный граф? Lowlink и активный стек позволяют определить
+   границы SCC в исходном DFS.
+2. Почему нельзя обновлять lowlink по любому посещённому соседу? Сосед может
+   принадлежать уже закрытой SCC, которую нельзя объединять с текущей.
+3. Почему нужен второй стек? Завершённый кадр DFS может оставаться частью ещё
+   не закрытой SCC.
+4. Сколько рёбер просматривается? `m`, каждое исходящее ребро один раз.
+5. Как проверяется совпадение с Kosaraju? Через биекцию меток компонент,
+   а в небольших тестах ещё и сравнением принадлежности каждой пары вершин.
