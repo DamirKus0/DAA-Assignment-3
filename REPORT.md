@@ -5,27 +5,21 @@ Repository: https://github.com/DamirKus0/DAA-Assignment-3
 
 ## 1. Experiment and validation
 
-The implementation uses Java 17, adjacency lists and handwritten algorithms.
-Each graph kind and configuration starts with a new `Random(42)`.
-The sizes are 1,000, 3,162, 10,000, 31,623 and 100,000; densities are `m=4n`
-and `m=20n`. Undirected graphs start with a shuffled random spanning tree.
-Directed graphs use random edges only. DAGs use a shuffled **rank indexed by
-vertex**, orienting each edge from lower to higher rank. When endpoints coincide,
-the second endpoint is drawn again, before drawing the weight `1+nextInt(1000)`.
-Parallel edges remain. All ten reference configurations match, confirming this
-interpretation of the generator for the required inputs.
+The Java 17 implementation uses adjacency lists and handwritten algorithms.
+Each graph starts with `new Random(42)`. Undirected graphs include the shuffled
+spanning tree; directed graphs use random edges; DAGs orient edges by shuffled
+vertex ranks. Coincident endpoints trigger another second-endpoint draw, then
+weight `1+nextInt(1000)`. Parallel edges remain. Five sizes and two densities
+produce the following ten configurations; all reference answers match.
 
-Each algorithm is executed five times on the same unchanged graph. The CSV stores
-the median time and counters from that run; counter equality is checked across
-all five runs. There is no separate warmup. Timing includes the complete algorithm
-call, its preparation, allocation and result construction. Graph generation,
-reference checking, topological-order validation, distance summation and CSV I/O
-are outside timing. `results/environment.txt` records Microsoft JDK 17.0.18,
-macOS/aarch64, eight available processors and a 2 GiB maximum Java heap.
+Five runs use the same unchanged graph, without separate warmup. CSV stores
+median time and one run's counters, checked equal across runs. Timing includes
+algorithm preparation, allocation and result construction, excluding generation,
+validation, distance summation and CSV I/O. `results/environment.txt` records
+Microsoft JDK 17.0.18, macOS/aarch64, eight processors and a 2 GiB heap limit.
 
-The benchmark checks Kruskal/Prim agreement, one tree with `n-1` edges,
-every topological-order constraint, reference answers and required scan counts.
-It fails before writing the final CSV if any check fails. These are computed results:
+The benchmark validates MST agreement and structure, topological order, references
+and scan identities before writing CSV. These results are computed, not substituted:
 
 | n | m | MST weight (both) | SCC count | Sum of DAG distances |
 | ---: | ---: | ---: | ---: | ---: |
@@ -54,31 +48,25 @@ Here `n=V`, `m=E`. Extra space excludes the input graph but includes the result.
 | Kahn | O(n+m) | O(n) | In-degrees, queue and output permutation. |
 | DAG shortest paths | O(n+m) | O(n) | Kahn, source initialization and one relaxation pass. |
 
-Kruskal's usual connected-graph bound is O(m log m). Prim here stores edges,
-including stale candidates, so claiming O(n) queue storage would be incorrect.
-Parallel edges also make O(m log m) the appropriate queue bound without assuming
-a simple graph. Path reconstruction takes O(k) time and memory for k vertices.
+Kruskal's connected-graph bound simplifies to O(m log m). Prim's edge heap,
+including stale/parallel candidates, needs O(m) storage and a log m factor.
+Reconstructing a k-vertex path takes O(k) time and memory.
 
-`dsu_ops` counts valid find calls plus successful unions. Kruskal explicitly
-checks both roots and then calls union, giving five DSU operations per accepted
-edge and two per rejected candidate. Its `edge_scans` excludes copying/sorting
-and stops when one component remains. Prim counts every adjacency entry: `2m`.
-Their `comparisons` count actual weight-comparator calls, including stale-entry
-heap work. Kosaraju counts `2m` during DFS, excluding the additional `m` edges
-used to build the reverse graph. Kahn counts `m` during queue processing on a DAG,
-excluding its initial in-degree pass. DAG shortest paths count `m` relaxations
-and `m` comparisons of candidate path weights; three earlier edge passes are
-separate (Kahn preparation, Kahn processing, source initialization). All preparation
-remains inside the time/space bounds. `max_depth` is the maximum active DFS path
-length in vertices across either Kosaraju pass, not allocated capacity or JVM
-call depth; the other algorithms report zero. It depends on adjacency order.
+`dsu_ops` counts find calls plus successful unions: five per accepted Kruskal
+edge, two per rejected candidate. Kruskal scans sorted candidates until connected;
+copying/sorting is excluded. Prim scans `2m` adjacency entries. Their `comparisons`
+count weight-comparator calls. Kosaraju scans `2m` in DFS, with another uncounted
+`m` for reversal. Kahn scans `m` in its queue pass, excluding in-degree preparation.
+DAG paths count `m` relaxations/comparisons, excluding three preparatory edge
+passes (Kahn degrees, Kahn queue, source detection). Preparation stays inside
+time/space bounds. Kosaraju's `max_depth` is the largest active DFS path across
+both passes, in vertices; it depends on traversal order. Other mandatory
+algorithms have no DFS stack and report zero.
 
 ## 3. Counters, slopes and plots
 
-`scripts/plot_results.py` computes least-squares slopes of log(count) against
-log(n), using all five sizes separately at each density. `results/analysis.json`
-contains slopes, ratios, scan shares and times; no measurements are hand-entered
-by the plotting script.
+`scripts/plot_results.py` fits log(count) against log(n), separately per density,
+and writes slopes, ratios and scan shares to `results/analysis.json`.
 
 | Algorithm | Normalized counter | Range, m=4n | Range, m=20n | Operation slope, sparse / dense |
 | --- | --- | --- | --- | --- |
@@ -88,22 +76,19 @@ by the plotting script.
 | Kahn | edge_scans / (n+m) | 0.800 | 0.952 | 1.0000 / 1.0000 |
 | DAG paths | edge_scans / (n+m) | 0.800 | 0.952 | 1.0000 / 1.0000 |
 
-Traversal ratios are exactly constant at each density. Prim's comparison ratio
-is approximately stable; Kruskal's decreases rather than staying exactly constant.
-The fixed 1,000-value weight range creates many ties at larger sizes, and the
-comparison sort's measured behavior need not realize its worst-case upper bound.
-These finite observations are compatible with the bounds, not an asymptotic proof.
+Traversal ratios are constant. Prim's comparison ratio is approximately stable;
+Kruskal's decreases. The fixed 1,000-value weight range creates many ties, and
+sorting need not realize its worst-case bound. Finite observations are compatible
+with the bounds, not an asymptotic proof.
 Kruskal's `dsu_ops/m` ranges from 2.290 to 2.748 (sparse) and 0.565 to 0.894 (dense);
 it reflects the inspected prefix, not the internal parent-pointer cost of find.
 Counting calls alone does not experimentally prove the α(n) bound.
 
-The actual **scan** slopes of Kruskal are **1.0550 / 1.1194**. They differ from
-comparison slopes because the examined fraction changes; they are not evidence
-of sorting's logarithmic factor. Prim and all three traversal scan slopes are 1.
-Kruskal examines 77.05–99.92% of sparse edges, versus 20.74–37.18% of dense edges.
-Early stopping therefore saves many dense-graph DSU checks, while sorting still
-processes every edge. Prim scans `2m` adjacency entries and maintains its heap;
-these are different units, so scan counts alone cannot establish a universal winner.
+Kruskal's **scan** slopes are **1.0550 / 1.1194**, reflecting a changing examined
+fraction, not sorting's log factor. All other scan slopes are 1. Kruskal examines
+77.05–99.92% of sparse versus 20.74–37.18% of dense edges. Early stopping saves
+DSU checks, but all edges are sorted. Prim scans `2m` and maintains a heap;
+different counter units cannot establish a universal winner.
 
 Three reproducible figures (linked separately to keep the report compact):
 
@@ -152,43 +137,36 @@ the stored distance, even when parallel edges have different weights.
 | Shortest paths, directed acyclic input, negative weights possible | DAG relaxation: linear after topological ordering. |
 | General directed graph with negative weights | Bellman–Ford with negative-cycle detection; test oracle only here. |
 
-At n=100,000 and m=2,000,000 the recorded medians were approximately 312 ms
-(Kruskal), 970 ms (Prim), 276 ms (Kosaraju), 52 ms (Kahn) and 100 ms (DAG paths).
-At small sizes some times decrease as n grows, illustrating JIT and measurement
-noise. There is no explicit warmup, algorithms run in a fixed order, and GC,
-allocation, cache state, other processes and JVM/hardware affect medians.
-Five runs reduce outlier sensitivity but do not make a rigorous timing comparison;
-the stable operation counts are the main evidence. Comparator counts can also
-change with a different JDK collection implementation, unlike the exact traversal
-scan identities. The observed large-case advantage of Kruskal over this edge-heap
-Prim is specific to this generator and implementation.
+At n=100,000 and m=2,000,000 the final medians were approximately 257 ms
+(Kruskal), 1,031 ms (Prim), 287 ms (Kosaraju), 40 ms (Kahn) and 84 ms (DAG paths).
+Some small-case times decrease as n grows: there is no warmup, and JIT, GC,
+caches, fixed execution order, background load and hardware affect medians.
+Five runs reduce outlier sensitivity without making timing decisive.
+Comparator counts can change with JDK collections; exact traversal scan
+identities do not. Kruskal's observed advantage applies to this generator and
+edge-heap Prim, not all inputs or implementations.
 
 ## 6. Requirement interpretations and reproduction
 
-**Bonus Tarjan.** The iterative implementation uses discovery indices, lowlink,
-a DFS-path stack and a separate active-SCC stack. Tests include 100 random graphs,
-100,000-vertex paths/cycles and edges into already completed SCCs. The bonus
-benchmark compares the entire partition with Kosaraju, not just component counts,
-on all ten generated directed graphs. Tarjan needs O(n+m) time and O(n) extra
-space, scans m edges rather than Kosaraju's 2m DFS scans, and also avoids building
-the reverse graph. `results/bonus.csv` holds these measurements separately.
+**Bonus Tarjan.** Iterative discovery/lowlink uses separate DFS and active-SCC
+stacks. Tests cover 100 random graphs and 100,000-vertex paths/cycles; all ten
+generated partitions match Kosaraju. Tarjan uses O(n+m) time and O(n) extra space,
+scans m rather than 2m edges, and avoids graph reversal.
 
-**Bonus condensation and critical path.** Each SCC becomes an indivisible block
-of duration equal to its number of original vertices; dependencies have zero lag,
-and original edge weights are ignored. This assumes internal cyclic dependencies
-have been resolved; contraction alone does not make a deadlock schedulable.
-Duplicate inter-component dependencies are removed. The condensation is acyclic,
-since a cycle of components would imply mutual reachability and one SCC.
-Topological max-relaxation computes earliest block completion and the longest
-duration chain, with source durations included. It is checked by exhaustive path
-enumeration on small graphs and by sign-flipped shortest paths on all ten generated
-configurations. With c SCCs and e dependencies, the path pass costs O(c+e) time and
-O(c) extra space; condensation construction takes expected O(n+m) time/space using
-a hash set. The longest simple path in a general graph is NP-hard, whereas a DAG
-admits this dynamic program. The result models project makespan with unlimited
-parallel resources. Bonus CSV has 20 rows; CriticalPath n/m refer to the condensed
-graph, with original sizes in its label. Its timer includes condensation and path
-computation but excludes the separately measured SCC computation.
+**Bonus critical path.** Each SCC is a block of duration equal to its vertex count;
+dependencies have zero lag, ignoring original weights. Internal cycles must already
+be resolved; contraction does not cure deadlock. Deduplicated condensation is a
+DAG: a component cycle would imply one SCC. Topological max-relaxation, including
+source durations, gives project makespan with unlimited parallel resources.
+Tests use exhaustive paths; the benchmark checks sign-flipped shortest paths.
+For c SCCs/e dependencies, the path costs O(c+e) time/O(c) space; hash-based
+condensation takes expected O(n+m) time/space. Longest simple paths are NP-hard
+on general graphs, while DAG order permits this dynamic program.
+For the largest sparse graph, 3,923 SCCs yield 4,331 dependencies and critical
+duration 96,085; the dense graph is one SCC of duration 100,000.
+The separate 20-row `results/bonus.csv` labels original sizes; CriticalPath n/m
+describe the condensation. Its timer includes condensation/path work, excluding
+the separately measured SCC calculation.
 
 The detailed requirement specifies ten size/density configurations, each with
 three graph kinds and five algorithm rows. This produces 50 rows, resolving the

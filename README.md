@@ -5,11 +5,14 @@
 и кратчайшие пути в DAG.
 Код использует обычные массивы, циклы и коллекции Java.
 
-**Текущий этап: `feature/paths-critical`.** Реализованы Graph, чтение файлов, DSU,
+**Итоговая ветка: `feature/metrics-final`.** Реализованы Graph, чтение файлов, DSU,
 Kruskal, Prim, итеративный Kosaraju, Kahn, кратчайшие пути в DAG,
 их счётчики и тесты, полный бенчмарк, CSV, три графика и отчёт.
 Все 50 строк прошли проверку по таблице задания. Добавлены оба бонуса:
 итеративный Tarjan, конденсация и критический путь с явной моделью длительностей.
+Финальная проверка 19 октября 2026: `mvn clean verify` — 105 тестов без ошибок;
+обязательный и бонусный бенчмарки повторно выполнены, графики построены из CSV.
+Слияние в `main`, тег и личные данные остаются за пользователем; см. [SUBMISSION.md](SUBMISSION.md).
 
 Автор: `<NAME SURNAME>`; группа: `<GROUP>`.
 GitHub: https://github.com/DamirKus0/DAA-Assignment-3
@@ -36,6 +39,7 @@ java -Xmx2g -cp target/classes benchmark.Benchmark
 java -Xmx2g -cp target/classes benchmark.BonusBenchmark
 python3 -m pip install -r requirements-plots.txt
 python3 scripts/plot_results.py
+python3 scripts/package_submission.py
 ```
 
 `package` также запускает тесты и создаёт JAR в `target/`. Бенчмарк запускается
@@ -90,13 +94,16 @@ data/
   dag-directed.txt
 README.md
 REPORT.md
+SUBMISSION.md
 scripts/plot_results.py
+scripts/package_submission.py
 requirements-plots.txt
 results/results.csv
 results/bonus.csv
 results/environment.txt
 results/analysis.json
 results/plots/ (три PNG)
+dist/ (ZIP с placeholders, не включается в Git)
 ```
 
 ## Граф и формат файлов
@@ -545,10 +552,11 @@ Kahn и поиск пути; вычисление SCC выполнено ран�
 
 ## Порядок работы с Git
 
-План веток: `feature/dsu` (проверенная основа), `feature/mst`, `feature/scc`,
-`feature/paths`, `feature/metrics`. Бонусы добавляются после обязательной части
-в ветки соответствующих алгоритмов. README расширяется по мере реализации;
-итоговые отчёт, графики и ZIP готовятся после измерений.
+Пять обязательных веток: `feature/dsu`, `feature/mst`, `feature/scc`,
+`feature/paths`, `feature/metrics`. После обязательной части бонусы добавлены
+в `feature/scc-tarjan` и `feature/paths-critical`; финальная проверка и упаковка —
+в `feature/metrics-final`. Дополнительные ветки позволили продолжить цепочку
+без самостоятельного слияния или переписывания существующих веток.
 
 Перед изменениями проверяется текущая ветка. После каждой фичи запускаются тесты.
 Первые четыре фичи пользователь коммитил самостоятельно; начиная с метрик он
@@ -557,16 +565,17 @@ Kahn и поиск пути; вычисление SCC выполнено ран�
 нет. Слияния и релизный тег `v1.0` по-прежнему выполняет пользователь.
 
 Ветки созданы последовательно от подтверждённых коммитов:
-`feature/dsu -> feature/mst -> feature/scc -> feature/paths -> feature/metrics`.
+`feature/dsu -> feature/mst -> feature/scc -> feature/paths -> feature/metrics
+-> feature/scc-tarjan -> feature/paths-critical -> feature/metrics-final`.
 Каждая следующая ветка включает предыдущий код. Кратчайшие пути используют Kahn
 из `feature/scc`; порядок включения изменений в `main` соответствует этой цепочке.
-Поскольку первоначальный репозиторий не содержал коммитов и локальная `main`
-пока не создана, её можно создать командой `git branch main feature/dsu`.
-После коммита и проверки путей пользователь может выполнить `git switch main`,
-`git merge --ff-only feature/mst`, `git merge --ff-only feature/scc`
-и `git merge --ff-only feature/paths`
-при чистом рабочем дереве. Промежуточное слияние не нужно для продолжения работы
-в цепочке feature-веток; итоговое слияние выполняет пользователь.
+Локальная и удалённая `main` пока не созданы. Последняя feature-ветка включает
+все предыдущие изменения; пользователь может создать `main` от `feature/dsu`
+и выполнить одно `git merge --ff-only feature/metrics-final`. Точные команды
+слияния, тега `v1.0` и отправки приведены в [SUBMISSION.md](SUBMISSION.md).
+Там же перечислены требования PDF и команда упаковки без `target/`, `.git/`
+и временных файлов. ZIP по умолчанию называется
+`dist/DAA_Assignment3_NAME_SURNAME_GROUP.zip`; перед сдачей замените placeholders.
 
 ## Использование ИИ
 
@@ -586,8 +595,9 @@ Kahn и поиск пути; вычисление SCC выполнено ран�
 > или стека по шагам. После этого объясни сложность и задай мне несколько вопросов
 > для проверки понимания. Не переходи сразу к объяснению всего проекта.
 
-Ниже описаны реализованные модули. Остальные блоки будут добавляться вместе
-с кодом, чтобы ссылки всегда указывали на существующие файлы.
+Ниже находятся все 14 блоков: GRAPH, DSU, KRUSKAL, PRIM, SCC, TOPO, PATH,
+METRICS, BENCH, TESTS, REPORT, DEFENSE, TARJAN, CRITICAL. Пути относятся к корню
+репозитория; при переносе блока в другой чат приложите указанные файлы.
 
 ### GRAPH — устройство графа и чтение файла
 
